@@ -132,7 +132,7 @@ func (h *handler) storeForm(form form, language language) (err error) {
 	query := `
 		INSERT INTO inschrijving (
 			inschrijfnummer, jaar, voornaam, achternaam, email, telefoon, vereniging, taal, inschrijfdatum
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
 	`
 
@@ -149,8 +149,7 @@ func (h *handler) storeForm(form form, language language) (err error) {
 		"submitTime":     form.SubmitTime,
 	})).Info("Insert inschrijving")
 
-	lastInsertID := 0
-	tx.QueryRow(query,
+	if _, err = tx.Exec(query,
 		subscriptionID,
 		year,
 		form.Name,
@@ -160,14 +159,20 @@ func (h *handler) storeForm(form form, language language) (err error) {
 		form.Club,
 		string(language),
 		form.SubmitTime,
-	).Scan(&lastInsertID)
+	); err != nil {
+		log.WithField("error", err).Error("Failed to create subscription")
+		return
+	}
 
 	placeholders := make([]string, 0, len(form.Teams))
-	values := make([]interface{}, 0, 4*len(form.Teams))
+	values := make([]interface{}, 0, 3*len(form.Teams))
 
-	for _, team := range form.Teams {
-		placeholders = append(placeholders, "(?, ?, ?, ?)")
-		values = append(values, lastInsertID, team.Name, team.Type, team.Level)
+	for i, team := range form.Teams {
+		placeholders = append(
+			placeholders,
+			fmt.Sprintf("(currval('inschrijving_id_seq'), $%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3),
+		)
+		values = append(values, team.Name, team.Type, team.Level)
 	}
 
 	query = `
@@ -180,7 +185,7 @@ func (h *handler) storeForm(form form, language language) (err error) {
 		"values": values,
 	})).Info("Inserting teams")
 
-	if _, err = tx.Query(query, values...); err != nil {
+	if _, err = tx.Exec(query, values...); err != nil {
 		log.WithField("error", err).Error("Failed to create teams")
 		return
 	}
