@@ -85,8 +85,10 @@ func (h *handler) Handle(message Message) (err error) {
 	switch message.Title {
 	case "Inschrijven teams":
 		lang = nl
+		log.Info("Handling Dutch form")
 	case "Sign up teams":
 		lang = en
+		log.Info("Handling English form")
 	default:
 		log.WithField("title", message.Title).Info("Ignoring message")
 		return
@@ -94,10 +96,16 @@ func (h *handler) Handle(message Message) (err error) {
 
 	var form form
 	if form, err = parseData(message.Data, lang); err != nil {
+		log.WithFields(log.Fields(map[string]interface{}{
+			"error": err,
+			"data":  message.Data,
+		})).Error("Failed to parse data")
 		return
 	}
 
-	err = h.storeForm(form, lang)
+	if err = h.storeForm(form, lang); err != nil {
+		log.WithField("error", err).Error("Failed to store form")
+	}
 
 	return
 }
@@ -105,6 +113,7 @@ func (h *handler) Handle(message Message) (err error) {
 func (h *handler) storeForm(form form, language language) (err error) {
 	var tx *sql.Tx
 	if tx, err = h.db.Begin(); err != nil {
+		log.WithField("error", err).Error("Failed to start transaction")
 		return
 	}
 
@@ -120,13 +129,28 @@ func (h *handler) storeForm(form form, language language) (err error) {
 	// April to August, this should be safe enough
 	year := time.Now().Year()
 
-	lastInsertID := 0
-	tx.QueryRow(`
+	query := `
 		INSERT INTO inschrijving (
 			inschrijfnummer, jaar, voornaam, achternaam, email, telefoon, vereniging, taal, inschrijfdatum
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-		`,
+	`
+
+	log.WithFields(log.Fields(map[string]interface{}{
+		"query":          query,
+		"subscriptionID": subscriptionID,
+		"year":           year,
+		"name":           form.Name,
+		"surname":        form.Surname,
+		"email":          form.Email,
+		"phone":          form.Phone,
+		"club":           form.Club,
+		"language":       string(language),
+		"submitTime":     form.SubmitTime,
+	})).Info("Insert inschrijving")
+
+	lastInsertID := 0
+	tx.QueryRow(query,
 		subscriptionID,
 		year,
 		form.Name,
@@ -146,15 +170,24 @@ func (h *handler) storeForm(form form, language language) (err error) {
 		values = append(values, lastInsertID, team.Name, team.Type, team.Level)
 	}
 
-	if _, err = tx.Query(`
+	query = `
 		INSERT INTO team (inschrijvingsid, teamnaam, type, niveau)
 		VALUES
-	`+strings.Join(placeholders, ","),
-		values...); err != nil {
+	` + strings.Join(placeholders, ",")
+
+	log.WithFields(log.Fields(map[string]interface{}{
+		"query":  query,
+		"values": values,
+	})).Info("Inserting teams")
+
+	if _, err = tx.Query(query, values...); err != nil {
+		log.WithField("error", err).Error("Failed to create teams")
 		return
 	}
 
-	err = tx.Commit()
+	if err = tx.Commit(); err != nil {
+		log.WithField("error", err).Error("Failed to commit transaction")
+	}
 
 	return
 }
