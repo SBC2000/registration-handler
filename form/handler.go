@@ -171,7 +171,7 @@ func (h *handler) storeForm(form form, language language) (err error) {
 	}
 
 	query = `
-		INSERT INTO team (inschrijvingsid, teamnaam, type, niveau)
+		INSERT INTO team (inschrijvingsid, teamnaam, "type", niveau)
 		VALUES
 	` + strings.Join(placeholders, ",")
 
