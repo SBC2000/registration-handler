@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -88,6 +89,23 @@ func main() {
 			}
 		}
 	})
+
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		log.WithField("method", r.Method).Info("/health")
+
+		if _, err := w.Write([]byte("OK")); err != nil {
+			log.WithField("error", err).Error("Failed to handle health request")
+			http.Error(w, "Could not return health OK", http.StatusInternalServerError)
+		}
+	})
+
+	ticker := time.NewTicker(10 * time.Minute)
+	go func() {
+		baseURL := os.Getenv("BASE_URL")
+		for range ticker.C {
+			http.Get(fmt.Sprintf("%s/%s", baseURL, "health"))
+		}
+	}()
 
 	http.ListenAndServe(fmt.Sprintf(":%s", os.Getenv("PORT")), nil)
 }
