@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 
@@ -223,18 +222,7 @@ func parseData(data map[string]string, language language) (parsed form, err erro
 	parsed.Surname = readEntry("contact-surname")
 	parsed.Email = readEntry("contact-email")
 	parsed.Phone = readEntry("contact-phone")
-
-	if err == nil {
-		submitTimeParts := strings.Split(readEntry("submit-time"), ".")
-		if len(submitTimeParts) == 0 {
-			err = errors.New("Unknown submit time format")
-		}
-		var submitTimeUnix int64
-		if submitTimeUnix, err = strconv.ParseInt(submitTimeParts[0], 10, 64); err != nil {
-			return
-		}
-		parsed.SubmitTime = time.Unix(submitTimeUnix, 0)
-	}
+	parsed.SubmitTime = time.Now()
 
 	for i := 0; i < 5; i++ {
 		if parsedTeam := parseTeam(data, language, i); parsedTeam != nil {
