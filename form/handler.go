@@ -224,7 +224,7 @@ func parseData(data map[string]string, language language) (parsed form, err erro
 	parsed.Phone = readEntry("contact-phone")
 	parsed.SubmitTime = time.Now()
 
-	for i := 0; i < 5; i++ {
+	for i := 1; i <= 5; i++ {
 		if parsedTeam := parseTeam(data, language, i); parsedTeam != nil {
 			parsed.Teams = append(parsed.Teams, *parsedTeam)
 		}
