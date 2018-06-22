@@ -35,11 +35,13 @@ func main() {
 
 	http.HandleFunc("/hook", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
+			log.WithField("method", r.Method).Error("Invalid method")
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
 		if r.Header.Get("X-hook-secret") != os.Getenv("WEBHOOK_SECRET") {
+			log.WithField("secret", r.Header.Get("X-hook-secret")).Error("Invalid secret")
 			http.Error(w, "Invalid Secret", http.StatusForbidden)
 			return
 		}
@@ -51,17 +53,23 @@ func main() {
 
 		defer r.Body.Close()
 		if buffer, err = ioutil.ReadAll(r.Body); err != nil {
+			log.WithField("error", err).Error("Cannot read body")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
+		log.WithField("body", string(buffer)).Info("Request body read")
+
 		var msg form.Message
 		if err = json.Unmarshal(buffer, &msg); err != nil {
+			log.WithField("error", err).Error("Cannot parse body")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		if r.Header.Get("X-test") != "" {
+			log.Info("Received test message")
+
 			resp := testResponse{
 				Message: "Received submission for form " + msg.Title,
 				Data:    msg.Data,
@@ -79,6 +87,8 @@ func main() {
 			w.Write(buffer)
 			return
 		} else {
+			log.WithField("message", msg).Info("Received message")
+
 			if err := formHandler.Handle(msg); err == nil {
 				log.WithField("title", msg.Title).Info("Successfully handled message")
 				w.WriteHeader(http.StatusOK)
