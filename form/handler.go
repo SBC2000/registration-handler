@@ -15,7 +15,7 @@ import (
 // Message describes a form submission from wordpress
 type Message struct {
 	Title string            `json:"title"`
-	Data  map[string]string `json:"data"`
+	Data  map[string]string `json:"posted_data"`
 }
 
 type form struct {
