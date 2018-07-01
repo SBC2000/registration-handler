@@ -149,15 +149,15 @@ func (h *handler) storeForm(form form, language language) (err error) {
 	})).Info("Insert inschrijving")
 
 	if _, err = tx.Exec(query,
-		subscriptionID,
+		trim(subscriptionID, 6),
 		year,
-		form.Name,
-		form.Surname,
-		form.Email,
-		form.Phone,
-		form.Club,
-		string(language),
-		form.SubmitTime,
+		trim(form.Name, 20),
+		trim(form.Surname, 30),
+		trim(form.Email, 50),
+		trim(form.Phone, 20),
+		trim(form.Club, 50),
+		trim(string(language), 2),
+		form.SubmitTime.Format("2006-01-02 15:04:05"),
 	); err != nil {
 		log.WithField("error", err).Error("Failed to create subscription")
 		return
@@ -171,7 +171,12 @@ func (h *handler) storeForm(form form, language language) (err error) {
 			placeholders,
 			fmt.Sprintf("(currval('inschrijving_id_seq'), $%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3),
 		)
-		values = append(values, team.Name, team.Type, team.Level)
+		values = append(
+			values,
+			trim(team.Name, 40),
+			trim(team.Type, 40),
+			trim(team.Level, 40),
+		)
 	}
 
 	query = `
@@ -270,4 +275,12 @@ func parseTeam(data map[string]string, language language, index int) (parsed *te
 	}
 
 	return
+}
+
+func trim(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+
+	return s[:maxLen]
 }
